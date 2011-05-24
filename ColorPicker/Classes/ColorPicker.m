@@ -7,6 +7,9 @@
 //
 
 #import "ColorPicker.h"
+@interface ColorPicker()
+CGContextRef CreateARGBBitmapContext (int pixelsWide, int pixelsHigh);
+@end
 
 @implementation ColorPicker
 
@@ -421,7 +424,7 @@
 	if(delta==0)
 		saturation=0;
 	else 
-		saturation=round(delta/vvalue);
+		saturation=delta/vvalue;
 	
 	if(saturation==0)
 		hue=0;
@@ -442,9 +445,9 @@
 		if(hue<0.0)
 			hue+=360.0;
 	}
-	color->hue=round(hue);
-	color->saturation=round(saturation);
-	color->vvalue=round(vvalue);
+	color->hue=hue;
+	color->saturation=saturation;
+	color->vvalue=vvalue;
 	return;	
 }
 
@@ -455,15 +458,25 @@
 -(void)drawOneComponentImage
 {
 	// get image size
-	int width=CGImageGetWidth(oneComponentView.image.CGImage);
-	int height=CGImageGetHeight(oneComponentView.image.CGImage);
+	int width = self.oneComponentView.frame.size.width;
+	int height = self.oneComponentView.frame.size.height;
 	int red,green,blue;
 	struct rgbhsvColor color;
 	float xPos;
 	
 	// delete old picker image
 	oneComponentView.image=nil;
-	
+    
+    // if view size change, need recreate context
+    size_t oldWidth = CGBitmapContextGetWidth(oneComponentContext);
+    size_t oldHeight = CGBitmapContextGetHeight(oneComponentContext);
+    
+    if (oldWidth != width || oldHeight != height) {
+        CGContextRelease(oneComponentContext);
+        oneComponentContext = CreateARGBBitmapContext(width, height);
+    }
+    
+	//CGContextClearRect(oneComponentContext, oneComponentView.frame);
 	// pointer image raw data
 	UBYTE *data = CGBitmapContextGetData (oneComponentContext);
 	CGRect frame;
@@ -483,7 +496,7 @@
 					data[x*4+y*width*4+2]=actualColor.green;	// green
 					data[x*4+y*width*4+3]=red;					// red;
 				}
-				red++;
+				red = round((float)x / (float)width * 255.0);
 			}
 			xPos=((float)actualColor.red*oneComponentView.frame.size.width/255.0);
 			// calc position of selector arrow
@@ -504,7 +517,7 @@
 					data[x*4+y*width*4+2]=green;
 					data[x*4+y*width*4+3]=actualColor.red;
 				}
-				green++;
+				green = round((float)x / (float)width * 255.0);
 			}
 			xPos=((float)actualColor.green*oneComponentView.frame.size.width/255.0);
 			frame=CGRectMake((xPos)-10, 0, arrowView.frame.size.width, arrowView.frame.size.height);
@@ -523,7 +536,7 @@
 					data[x*4+y*width*4+2]=actualColor.green;
 					data[x*4+y*width*4+3]=actualColor.red;
 				}
-				blue++;
+				blue = round((float)x / (float)width * 255.0);
 			}
 			xPos=((float)actualColor.blue*oneComponentView.frame.size.width/255.0);
 			frame=CGRectMake((xPos)-10, 0, arrowView.frame.size.width, arrowView.frame.size.height);
@@ -545,7 +558,7 @@
 					data[x*4+y*width*4+2]=color.green;
 					data[x*4+y*width*4+3]=color.red;
 				}
-				color.hue+=(360.0/255.0);
+				color.hue = (float)x / (float)width * 360.0;
 			}
 			frame=CGRectMake(((float)actualColor.hue*oneComponentView.frame.size.width/360.0)-10, 0, arrowView.frame.size.width, arrowView.frame.size.height);
 			arrowView.frame=frame;
@@ -566,7 +579,7 @@
 					data[x*4+y*width*4+2]=color.green;
 					data[x*4+y*width*4+3]=color.red;
 				}
-				color.saturation+=(1/255.0);
+				color.saturation = (float)x / (float)width;
 			}
 			frame=CGRectMake(((float)actualColor.saturation*oneComponentView.frame.size.width)-10, 0, arrowView.frame.size.width, arrowView.frame.size.height);
 			arrowView.frame=frame;
@@ -587,7 +600,7 @@
 					data[x*4+y*width*4+2]=color.green;
 					data[x*4+y*width*4+3]=color.red;
 				}
-				color.vvalue+=(1.0/255.0);
+				color.vvalue = (float)x / (float)width;
 			}
 			frame=CGRectMake(((float)actualColor.vvalue*oneComponentView.frame.size.width)-10, 0, arrowView.frame.size.width, arrowView.frame.size.height);
 			arrowView.frame=frame;
@@ -609,17 +622,28 @@
 -(void)drawTwoComponentImage
 {
 	// get image size
-	int width=CGImageGetWidth(twoComponentView.image.CGImage);
-	int height=CGImageGetHeight(twoComponentView.image.CGImage);
+	int width = self.twoComponentView.frame.size.width;
+	int height = self.twoComponentView.frame.size.height;
 	
 	// delete old picker image
 	twoComponentView.image=nil;
 	
+    // if view size change, need recreate context
+    size_t oldWidth = CGBitmapContextGetWidth(twoComponentContext);
+    size_t oldHeight = CGBitmapContextGetHeight(twoComponentContext);
+    
+    if (oldWidth != width || oldHeight != height) {
+        CGContextRelease(twoComponentContext);
+        twoComponentContext = CreateARGBBitmapContext(width, height);
+    }
+    
 	// image raw data
 	UBYTE *data = CGBitmapContextGetData (twoComponentContext);
 	int blue,green,red;
 	struct rgbhsvColor color;
-	CGRect frame;
+	CGRect frame = circleView.frame;
+    CGFloat xMax = twoComponentView.frame.size.width;
+    CGFloat yMax = twoComponentView.frame.size.height;
 	
 	// which component must be drawn ?
 	switch (rgbhsvButton.selectedSegmentIndex)
@@ -635,34 +659,37 @@
 					data[x*4+y*width*4]=255;					// alpha
 					data[x*4+y*width*4+1]=blue;					// blue
 					data[x*4+y*width*4+2]=green;				// green
-					data[x*4+y*width*4+3]=actualColor.red;		// red
-					green--;		
+					data[x*4+y*width*4+3]=actualColor.red;		// red	
+                    green = round(255.0 - (float)y / (float)height * 255.0);
 				}
-				blue++;
+				blue = round((float)x / (float)width * 255.0);
 			}
 			// calc position for selector circle
-			frame=CGRectMake((actualColor.blue)-10,(255.0-actualColor.green)-10, circleView.frame.size.width, circleView.frame.size.height);
+            frame.origin.x = (actualColor.blue / 255.0 * xMax)-10;
+            frame.origin.y = (yMax - actualColor.green / 255.0 * yMax)-10;
 			// move circle to new position
 			circleView.frame=frame;
 			break;
 			
 		// red and blue
 		case 1:
-			blue=red=0;
+			blue=0;
 			for(int x=0;x<width;x++)
 			{
+                red = 255;
 				for(int y=0;y<height;y++)
 				{
 					data[x*4+y*width*4]=255;
 					data[x*4+y*width*4+1]=blue;
 					data[x*4+y*width*4+2]=actualColor.green;
 					data[x*4+y*width*4+3]=red;
-					red--;
+					red = round(255.0 - (float)y / (float)height *255.0);
 				}
-				blue++;
+				blue = round((float)x / (float)width *255.0);
 			}
 
-			frame=CGRectMake((actualColor.blue)-10, (255-actualColor.red)-10, circleView.frame.size.width, circleView.frame.size.height);
+            frame.origin.x = (actualColor.blue / 255.0 * xMax) - 10.0;
+            frame.origin.y = (yMax - actualColor.red / 255.0 * yMax) - 10.0;
 			circleView.frame=frame;
 			break;
 			
@@ -678,12 +705,13 @@
 					data[x*4+y*width*4+1]=actualColor.blue;
 					data[x*4+y*width*4+2]=green;
 					data[x*4+y*width*4+3]=red;
-					green--;
+					green = round(255.0 - (float)y / (float)height *255.0);;
 				}
-				red++;
+				red = round((float)x / (float)width *255.0);
 			}
 			
-			frame=CGRectMake((actualColor.red)-10, (255-actualColor.green)-10, circleView.frame.size.width, circleView.frame.size.height);
+			frame.origin.x = (actualColor.red / 255.0 * xMax) - 10.0;
+            frame.origin.y = (yMax - actualColor.green / 255.0 * yMax) -10.0;
 			circleView.frame=frame;
 			break;
 
@@ -701,12 +729,14 @@
 					data[x*4+y*width*4+1]=color.blue;
 					data[x*4+y*width*4+2]=color.green;
 					data[x*4+y*width*4+3]=color.red;
-					color.vvalue-=(1.0/255.0);
+                    color.vvalue = 1.0 - (float)y / (float)height;
+                    [self hsvToRGB:&color];
 				}
-				color.saturation+=(1.0/255.0);
+				color.saturation = ((float)x / (float)height);
 			}
 			
-			frame=CGRectMake((actualColor.saturation*255.0)-10, (255-actualColor.vvalue*255.0)-10, circleView.frame.size.width, circleView.frame.size.height);
+            frame.origin.x = (actualColor.saturation * xMax) - 10.0;
+            frame.origin.y = (yMax - actualColor.vvalue * yMax) - 10.0;
 			circleView.frame=frame;
 			break;
 
@@ -724,12 +754,14 @@
 					data[x*4+y*width*4+1]=color.blue;
 					data[x*4+y*width*4+2]=color.green;
 					data[x*4+y*width*4+3]=color.red;
-					color.vvalue-=(1.0/255.0);
+					color.vvalue = 1.0 - (float)y / (float)height;
+                    [self hsvToRGB:&color];
 				}
-				color.hue+=(360.0/255.0);
+				color.hue = ((float)x / (float)height * 360.0);
 			}
 			
-			frame=CGRectMake((actualColor.hue*255.0/360.0)-10, (255-actualColor.vvalue*255.0)-10, circleView.frame.size.width, circleView.frame.size.height);
+            frame.origin.x = (actualColor.hue / 360.0 * xMax) - 10.0;
+            frame.origin.y = (yMax - actualColor.vvalue * yMax) - 10.0;
 			circleView.frame=frame;
 			break;
 
@@ -747,12 +779,14 @@
 					data[x*4+y*width*4+1]=color.blue;
 					data[x*4+y*width*4+2]=color.green;
 					data[x*4+y*width*4+3]=color.red;
-					color.saturation-=(1.0/255.0);
+					color.saturation = 1.0 - (float)y / (float)height;
+                    [self hsvToRGB:&color];
 				}
-				color.hue+=(360.0/255.0);
+				color.hue = ((float)x / (float)height * 360.0);
 			}
 			
-			frame=CGRectMake((actualColor.hue*255.0/360.0)-10, (255-actualColor.saturation*255.0)-10, circleView.frame.size.width, circleView.frame.size.height);
+            frame.origin.x = (actualColor.hue / 360.0 * xMax) - 10.0;
+            frame.origin.y = (yMax - actualColor.saturation * yMax) - 10.0;
 			circleView.frame=frame;
 			break;
 
@@ -769,23 +803,16 @@
 }
 
 // get rgba bitmap of image
-CGContextRef CreateARGBBitmapContext (CGImageRef inImage)
+CGContextRef CreateARGBBitmapContext (int pixelsWide, int pixelsHigh)
 {
     CGContextRef    context = NULL;
     CGColorSpaceRef colorSpace;
-    UBYTE *          bitmapData;
-    int             bitmapByteCount;
     int             bitmapBytesPerRow;
-	
-	// Get image width, height. We'll use the entire image.
-    int pixelsWide = CGImageGetWidth(inImage);
-    int pixelsHigh = CGImageGetHeight(inImage);
 	
     // Declare the number of bytes per row. Each pixel in the bitmap in this
     // example is represented by 4 bytes; 8 bits each of red, green, blue, and
     // alpha.
     bitmapBytesPerRow   = (pixelsWide * 4);
-    bitmapByteCount     = (bitmapBytesPerRow * pixelsHigh);
 	
     colorSpace = CGColorSpaceCreateDeviceRGB();
     if (colorSpace == NULL)
@@ -794,21 +821,11 @@ CGContextRef CreateARGBBitmapContext (CGImageRef inImage)
         return NULL;
     }
 	
-    // Allocate memory for image data. This is the destination in memory
-    // where any drawing to the bitmap context will be rendered.
-    bitmapData = calloc( bitmapByteCount, sizeof(UBYTE) );
-    if (bitmapData == NULL) 
-    {
-        fprintf (stderr, "Memory not allocated!");
-        CGColorSpaceRelease( colorSpace );
-        return NULL;
-    }
-	
     // Create the bitmap context. We want pre-multiplied ARGB, 8-bits 
     // per component. Regardless of what the source image format is 
     // (CMYK, Grayscale, and so on) it will be converted over to the format
     // specified here by CGBitmapContextCreate.
-    context = CGBitmapContextCreate (bitmapData,
+    context = CGBitmapContextCreate (NULL,  // pass NULL require iOS4
 									 pixelsWide,
 									 pixelsHigh,
 									 8,      // bits per component
@@ -817,7 +834,6 @@ CGContextRef CreateARGBBitmapContext (CGImageRef inImage)
 									 kCGBitmapByteOrder32Little|kCGImageAlphaPremultipliedLast);
     if (context == NULL)
     {
-        free (bitmapData);
         fprintf (stderr, "Context not created!");
     }
 	
@@ -1417,46 +1433,11 @@ CGContextRef CreateARGBBitmapContext (CGImageRef inImage)
 {
     [super viewDidLoad];
 	
-	// get base image for the two component picker
-	UIImage *twoComponentImage=[UIImage imageNamed:@"colorpicker_twocomponent.png"];
-	if(twoComponentImage)
-	{
-		twoComponentView.image=twoComponentImage;
-		// get the bitmap
-		twoComponentContext = CreateARGBBitmapContext(twoComponentImage.CGImage);
-		if (twoComponentContext!=NULL) 
-		{ 
-			// Get image width, height. We'll use the entire image.
-			size_t imageWidth = CGImageGetWidth(twoComponentImage.CGImage);
-			size_t imageHeight = CGImageGetHeight(twoComponentImage.CGImage);
-			CGRect imageRect = CGRectMake(0,0,imageWidth,imageHeight); 
-			
-			// Draw the image to the bitmap context. Once we draw, the memory 
-			// allocated for the context for rendering will then contain the 
-			// raw image data in the specified color space.
-			CGContextDrawImage(twoComponentContext, imageRect, twoComponentImage.CGImage); 
-		}
-	}
-	// get base image for the one component picker
-	UIImage *oneComponentImage=[UIImage imageNamed:@"colorpicker_onecomponent.png"];
-	if(oneComponentImage)
-	{
-		oneComponentView.image=oneComponentImage;
-		// get the bitmap
-		oneComponentContext = CreateARGBBitmapContext(oneComponentImage.CGImage);
-		if (oneComponentContext!=NULL) 
-		{ 
-			// Get image width, height. We'll use the entire image.
-			size_t imageWidth = CGImageGetWidth(oneComponentImage.CGImage);
-			size_t imageHeight = CGImageGetHeight(oneComponentImage.CGImage);
-			CGRect imageRect = CGRectMake(0,0,imageWidth,imageHeight);
-			
-			// Draw the image to the bitmap context. Once we draw, the memory 
-			// allocated for the context for rendering will then contain the 
-			// raw image data in the specified color space.
-			CGContextDrawImage(oneComponentContext, imageRect, oneComponentImage.CGImage); 
-		}
-	}
+    twoComponentContext = CreateARGBBitmapContext(self.twoComponentView.frame.size.width,
+                                                  self.twoComponentView.frame.size.height);
+    oneComponentContext = CreateARGBBitmapContext(self.oneComponentView.frame.size.width,
+                                                  self.oneComponentView.frame.size.height);
+	
 	
 	// selector images. circle for two component and arrow for one component
 	circleView=[[UIImageView alloc] initWithImage:[UIImage imageNamed:@"circle.png"]];
